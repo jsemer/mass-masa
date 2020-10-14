@@ -25,8 +25,15 @@ student_count = len(students)
 print(f"Mentors={mentor_count}")
 print(f"Students={student_count}")
 
+#
+# Create shuffled list of students
+#
 shuffle(students)
 
+#
+# Create shuffled list of mentors by doubling mentors that will take two students
+# and appending list of mentors that will take one student
+#
 mentors2a = copy.deepcopy(mentors2)
 mentors2b = copy.deepcopy(mentors2)
 shuffle(mentors2a)
@@ -40,11 +47,17 @@ mentors2a.extend(mentors2b)
 
 print(f"Combined mentors = {len(mentors2a)}")
 
+#
+# Create matches
+#
 m_matches = {}
 
 for mentor, student in zip(mentors2a, students):
 
     if not mentor['Email'] in m_matches:
+        #
+        # This is the mentors first student
+        #
         m = {}
         m['MentorEmail'] = mentor['Email']
         m['MentorFirstName'] = mentor['FirstName']
@@ -54,11 +67,17 @@ for mentor, student in zip(mentors2a, students):
         m['Student1Email'] = student['Email']
         m_matches[mentor['Email']] = m
     else:
+        #
+        # This is the mentors second student
+        #
         m = m_matches[mentor['Email']]
         m['Student2FirstName'] = student['FirstName']
         m['Student2LastName'] = student['LastName']
         m['Student2Email'] = student['Email']
 
+#
+# Open mentor match file and create header
+#
 mout = open("mentor_match.csv", "w+")
 
 m = "MentorEmail,MentorFirstName,MentorLastName,"
@@ -67,6 +86,9 @@ s2 = "Student2Email,Student2FirstName,Student2LastName"
 
 mout.write(f"{m}{s1}{s2}\n")
 
+#
+# Open student match file and create header
+#
 sout = open("student_match.csv", "w+")
 
 s1 = "StudentEmail,StudentFirstName,StudentLastName,"
@@ -74,6 +96,17 @@ m = "MentorEmail,MentorFirstName,MentorLastName"
 
 sout.write(f"{s1}{m}\n")
 
+#
+# Open unmatched students file and create header
+#
+uout = open("students_unmatched.csv", "w+")
+
+u = "FirstName,LastName,Email"
+uout.write(f"{u}\n")
+
+#
+# Write mentor and student records to the appropriate files
+#
 m_count = 0
 s_count = 0
 
@@ -119,6 +152,20 @@ for k, v in m_matches.items():
     sout.write(f"{s1},{m}\n")
     if len(s2_email):
         sout.write(f"{s2},{m}\n")
-        
+
+#
+# Add records of unmatched students
+#
+if len(students) > len(mentors2a):
+    print(f"Unassigned students")
+
+    for student in students[len(mentors2a):]:
+        first_name = student['FirstName']
+        last_name = student['LastName']
+        email = student['Email']
+
+        uout.write(f"{first_name},{last_name},{email}\n")
+
+
 print(f"Assigned mentors = {m_count}")
 print(f"Assigned students = {s_count}")
