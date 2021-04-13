@@ -229,3 +229,10 @@ for mentee_index, mentee in mentees_df.iterrows():
 ## Dump csv files for mentors_replicated_df and mentees_df 
 mentors_replicated_df.to_csv('mentors_final.csv', index=False)
 mentees_df.to_csv('mentees_final.csv', index=False)
+
+## Display Statistics
+print("Number of Mentors: " + str(len(mentors_df['Email'].index)))
+print("Number of Mentees: " + str(len(mentees_df['Email'].index)))
+print("Number of Mentees Allocated: " + str(len(mentees_df[mentees_df['MentorAllocated'] == True].index)))
+print("Number of Mentees Remaining: " + str(len(mentees_df[mentees_df['MentorAllocated'] != True].index)))
+
