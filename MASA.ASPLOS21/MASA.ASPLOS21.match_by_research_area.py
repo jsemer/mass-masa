@@ -74,6 +74,8 @@ gf_df[['MenteeSignup']]              = gf_df['MenteeSignup'].apply(lambda x: 'Ye
 
 ## Remove duplicates from Google Form Dataframe (HARDCODED):
 gf_df = gf_df.drop(gf_df[gf_df['Email'].str.match('delimitrou@cornell.edu|haoranq4@illinois.edu|gtzimpragos@ucsb.edu',na=False)].index)
+gf_df = gf_df.drop(gf_df[gf_df['Email'].str.match('yipeng.huang@rutgers.edu|sherwood@cs.ucsb.edu',na=False)].index)
+gf_df = gf_df.drop(gf_df[gf_df['Email'].str.match('ugupta@g.harvard.edu|shivampotdar99@gmail.com',na=False)].index)
 
 ## Combine Cleaned Dataframes
 cvent_df_clean = cvent_df[['FirstName','LastName','Email','Affiliation','SeniorResearcher/Student','MentorSignup','NumMentees',
@@ -96,7 +98,9 @@ mentees_df = combined_df.loc[(combined_df['SeniorResearcher/Student'] == 'Studen
                                                                 'Yes. Would prefer a mentor from Academia if possible',
                                                                 'Yes. Would prefer a mentor from Industry if possible'))].copy()
 
-## Check for duplicates in combined mentor/mentees dataframes
+## Check and Ensure no duplicates in combined mentor/mentees dataframes
+assert(mentors_df[mentors_df.duplicated(subset=['Email'])]['Email'].count() == 0)
+assert(mentees_df[mentees_df.duplicated(subset=['Email'])]['Email'].count() == 0)
 #print("Duplicates")
 #display(mentors_df[mentors_df.duplicated(subset=['Email'])])
 #display(mentees_df[mentees_df.duplicated(subset=['Email'])])
@@ -107,6 +111,9 @@ mentors_3mentees      = mentors_df[mentors_df['NumMentees'] == 'Three']
 mentors_replicated_df = [mentors_df,mentors_2mentees,mentors_3mentees, mentors_3mentees]
 mentors_replicated_df =  pandas.concat(mentors_replicated_df,ignore_index=True)
 
+## Shuffle mentors in mentors_replicated_df to avoid biased starting point.
+mentors_replicated_df = mentors_replicated_df.sample(frac=1)
+
 ## Create Research-Area Specific Lists of Mentors
 mentors_by_area = {}
 for area in research_areas:
@@ -115,18 +122,20 @@ for area in research_areas:
 #for area in research_areas:
 #    print(area)
 #    display(mentors_by_area[area])
-
-## TODO: Shuffle mentors in each area in "mentors_by_area", to avoid bias in starting point
     
-## TODO: Create List of Mentors Based on Industry/Academia
-
+## Create List of Mentors Based on Industry/Academia
+mentors_by_area_industry = {}
+mentors_by_area_academia = {}
+for area in research_areas:
+    mentors_by_area_industry[area] = mentors_by_area[area][mentors_by_area[area]['AffiliationType'].isin(["Industry", 'Both'])]
+    mentors_by_area_academia[area] = mentors_by_area[area][mentors_by_area[area]['AffiliationType'].isin(["Academia", 'Both'])]
 
 ##############################################################
 ## Match Mentees to Mentors By Reserach Area
 ##############################################################
 
 print("Matching First by Preference of Research Area")
-
+    
 mentee_count=0
 num_mentor_commitments = mentors_replicated_df['Email'].count()
 mentees_df.loc[:,'MentorAllocated'] = np.nan
@@ -136,16 +145,27 @@ mentors_replicated_df.loc[:,'MenteeAllocated'] = np.nan
 mentors_replicated_df.loc[:,'MenteeName']      = np.nan
 mentors_replicated_df.loc[:,'MenteeEmail']     = np.nan
 
+## Stats for tracking research area and industry/academia preference match success
+num_mentees_want_areamatch = 0  # For research area preference
+num_mentees_got_areamatch = 0 
+num_mentees_want_affiliationtype = 0 # For Industry/academia preference
+num_mentees_got_affiliationtype = 0
+
 
 ## Match using research area (ignore industry/academia preference for now)
 for mentee_index, mentee in mentees_df.iterrows():
     mentee_count=mentee_count+1
     if debug: print(mentee_index, mentee['FirstName'], mentee['LastName'])
     
+    ## Bools for tracking stats of research area match
+    mentee_wants_areamatch = False
+    mentee_got_areamatch = False
+    
     ## Iterate over mentees research area
     for area in research_areas:
         if(area in mentee['ResearchArea']):
             if debug: print ("MenteeResearchArea: ",area)
+            mentee_wants_areamatch = True
             
             #Check if Mentor available in mentee's research area
             if(not mentors_by_area[area].empty):                
@@ -170,9 +190,23 @@ for mentee_index, mentee in mentees_df.iterrows():
                         mentors_by_area[temp_area] = mentors_by_area[temp_area].drop(index=mentor_chosen_index)
                 
                 #Mentee is matched
+                mentee_got_areamatch = True
+                
+                #Update industry/academia preference match:
+                if (mentee['MenteeSignup'] in ['Yes. Would prefer a mentor from Academia if possible','Yes. Would prefer a mentor from Industry if possible']):
+                    num_mentees_want_affiliationtype += 1
+                if (((mentee['MenteeSignup'] == 'Yes. Would prefer a mentor from Academia if possible') and (mentor_chosen['AffiliationType'] in ['Academia','Both'])) or
+                   ((mentee['MenteeSignup'] == 'Yes. Would prefer a mentor from Industry if possible') and (mentor_chosen['AffiliationType'] in ['Industry','Both']))):
+                    num_mentees_got_affiliationtype += 1
+                    
                 break
+                
     if debug: print ("\n")
     
+    ## Update Research Area Match Stats
+    if mentee_wants_areamatch == True: num_mentees_want_areamatch = num_mentees_want_areamatch + 1
+    if mentee_got_areamatch == True: num_mentees_got_areamatch = num_mentees_got_areamatch + 1    
+        
     ## Stop matching once we hit the number of commitments from mentors
     if(mentee_count >= num_mentor_commitments):
         break
@@ -221,6 +255,13 @@ for mentee_index, mentee in mentees_df.iterrows():
         #Remove matched mentor from leftover list
         mentors_remaining_df = mentors_remaining_df.drop(index=mentor_chosen_index)
         
+        #Update industry/academia preference match:
+        if (mentee['MenteeSignup'] in ['Yes. Would prefer a mentor from Academia if possible','Yes. Would prefer a mentor from Industry if possible']):
+            num_mentees_want_affiliationtype += 1
+        if (((mentee['MenteeSignup'] == 'Yes. Would prefer a mentor from Academia if possible') and (mentor_chosen['AffiliationType'] in ['Academia','Both'])) or
+                   ((mentee['MenteeSignup'] == 'Yes. Would prefer a mentor from Industry if possible') and (mentor_chosen['AffiliationType'] in ['Industry','Both']))):
+            num_mentees_got_affiliationtype += 1
+            
     ## Stop matching once we hit the number of commitments from mentors
     if(mentee_count >= num_mentor_commitments):
         break
@@ -228,9 +269,23 @@ for mentee_index, mentee in mentees_df.iterrows():
         
 ## Dump csv files for mentors_replicated_df and mentees_df 
 mentors_replicated_df.to_csv('mentors_final.csv', index=False)
-mentees_df.to_csv('mentees_final.csv', index=False)
+mentees_df.to_csv('mentees_final.csv', index=False)        
 
-## Display Statistics
+## Print Stats for Matching of Preferences
+print("")
+print("Total Mentees Matched: "+str(mentee_count))
+print("Mentees Wanting Mentor in Matching Research Area: "+str(num_mentees_want_areamatch))
+print("Mentees Provided Mentor in Matching Research Area: "+str(num_mentees_got_areamatch))
+if num_mentees_got_areamatch > 0 : 
+    print("Research Area Matching Success Rate: "+str(int(num_mentees_got_areamatch/num_mentees_want_areamatch*100))+"%")
+print("")
+print("Mentees Wanting Mentor Specifically in Industry/Academia: "+str(num_mentees_want_affiliationtype))
+print("Mentees Provided Mentor Specifically in Industry/Academia: "+str(num_mentees_got_affiliationtype))
+if num_mentees_got_areamatch > 0 : 
+    print("Research Area Matching Success Rate: "+str(int(num_mentees_got_affiliationtype/num_mentees_want_affiliationtype*100))+"%")
+
+
+## Display Overall Statistics for Mentor/Mentee Matching
 print("Number of Mentors: " + str(len(mentors_df['Email'].index)))
 print("Number of Mentees: " + str(len(mentees_df['Email'].index)))
 print("Number of Mentees Allocated: " + str(len(mentees_df[mentees_df['MentorAllocated'] == True].index)))
