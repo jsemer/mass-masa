@@ -20,6 +20,44 @@ confused_not_interested = []
 
 list_institutions = [] 
 
+# To normalize the institutions we query google with the string provided by the
+# users. To avoid requerying google across multiple run of the script we create a persistent local
+# cache (Suggestion of J. Emer). The implementation is simply representing the cache as a python dictionary
+# stored on disk as json, reopened every time the decorator is called to read or write.
+# This minimalist implementation is directly copy/pasted from
+# https://stackoverflow.com/questions/16463582/memoize-to-disk-python-persistent-memoization
+# TODO: improve on this naive SO implementation by avoiding reopening the file on every query
+import json
+
+def persist_to_file(file_name):
+
+    def decorator(original_func):
+        try:
+            cache = json.load(open(file_name, 'r'))
+        except (IOError, ValueError):
+            cache = {}
+
+        def new_func(param):
+            if param not in cache:
+                cache[param] = original_func(param)
+                json.dump(cache, open(file_name, 'w'))
+            return cache[param]
+
+        return new_func
+
+    return decorator
+
+@persist_to_file('cache.dat')
+def normalizedInstitution(inst):
+    print(f"Query google for institution of {val['Email']}")
+    result = search(inst, tld="com", num=1, stop=1,pause=2.0)
+    for r in result:    
+        # There should be a single element in that iterator 
+        print(f"Obtained: {r}")
+        return r
+    #This should not be possible
+    exit(2)
+
 def is_student_confused(val):
     if not ('N/A' == val['Are you a part of Industry or Academia? We will use this to match with students, as per their preference.']):
         return True
@@ -51,11 +89,8 @@ for idx, val in enumerate(raw_data):
             val['Institutions'] = [] 
             #do a google query to identify the institution
             for inst in institutions:
-                print(f"Query google for institution of {val['Email']}")
-                result = search(inst, tld="com", num=1, stop=1,pause=2.0)
-                for r in result:    
-                    print(f"Obtained: {r}")
-                    val['Institutions'] += [r]
+                val['Institutions'] += [ normalizedInstitution(inst) ]
+
             students += [val]
         else:
             print(f"[Critical Warning Student] Contradictory data: {val['Email']} at row {idx + 1}")
@@ -68,11 +103,7 @@ for idx, val in enumerate(raw_data):
             val['Institutions'] = [] 
             #do a google query to identify the institution
             for inst in institutions:
-                print(f"Query google for institution of {val['Email']}")
-                result = search(inst, tld="com", num=1, stop=1,pause=2.0)
-                for r in result:
-                    print(f"Obtained: {r}")
-                    val['Institutions'] += [r]
+                val['Institutions'] += [ normalizedInstitution(inst) ]
             multiplicity = val['Historically, the number of mentees far exceeds the number of available mentors. Up to how many students would you be willing to mentor? (Expectation of each mentoring commitment is 30 minutes in the conference week)']
             try:
                 multiplicity = int(multiplicity)
@@ -120,10 +151,8 @@ for i in range(len(students)):
         mentor_institutions = mentors[j]['Institutions']
         for inst_s in student_institutions:
             for inst_m in mentor_institutions:
-                if SequenceMatcher(None,inst_s, inst_m).ratio() >= 0.95:
+                if inst_s == inst_m :
                     print(f"[Info] Aliased institutions {inst_s} and {inst_m} for conflict computation")
-                    if inst_s != inst_m:
-                        print(f"[Info] Aliased institutions {inst_s} and {inst_m} for conflict computation")
                     opt.add(x == 0)
         acc += x
         line += [x] 
@@ -157,8 +186,8 @@ for i in range(len(students)):
 m_choice_industry_academia = opt.maximize(respect_choice)
 
 def overlapping_interests(s, m):
-        si = s['Please provide research areas that best match your interests (tick all that apply). We will attempt to match students to mentors based on research areas if possible. Else, we will use random matching.'] 
-        mi = m['Mentor Please provide research areas that best match your interests (tick all that apply). We will attempt to match students to mentors based on research areas if possible. Else, we will use random matching.']
+        si = s['Students Please provide research areas that best match your interests (tick all that apply). We will attempt to match students to mentors based on research areas if possible. Else, we will use random matching.'] 
+        mi = m['Please provide research areas that best match your interests (tick all that apply). We will attempt to match students to mentors based on research areas if possible. Else, we will use random matching.']
         # print(si)
         # print(mi)
         if si == ['N/A'] or mi == ['N/A']:
