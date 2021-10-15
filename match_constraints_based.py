@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from googlesearch import search
 import random
 #TODO IMPORTANT Dealiased last two columns in the csv source file
-
+random.seed(873)
 debug = False  
 raw_data = list(csv.DictReader(open("input.csv")))
 
@@ -14,7 +14,7 @@ students = []
 mentors = []
 
 #we build lists of people that filled contradictory data, just in case we care about reaching out to them
-confused_students = []
+# confused_students = []
 confused_mentors = []
 confused_not_interested = []
 
@@ -84,17 +84,17 @@ for idx, val in enumerate(raw_data):
     if 'Student' in val[' The Meet-A-Senior-Architect (MASA) initiative offers mentorship opportunities to students by matching them with researchers in Academia/Industry for 30-minute one-on-one conversations. Are you interested in participating?']:
         if debug:
             print("Found interested student:", val['Email'])
-        if not(is_student_confused(val)):
-            institutions = val['Institution / Company Name'].split('/')
-            val['Institutions'] = [] 
-            #do a google query to identify the institution
-            for inst in institutions:
-                val['Institutions'] += [ normalizedInstitution(inst) ]
+        #if not(is_student_confused(val)):
+        institutions = val['Institution / Company Name'].split('/')
+        val['Institutions'] = [] 
+        #do a google query to identify the institution
+        for inst in institutions:
+            val['Institutions'] += [ normalizedInstitution(inst) ]
 
-            students += [val]
-        else:
-            print(f"[Critical Warning Student] Contradictory data: {val['Email']} at row {idx + 1}")
-            confused_students += [val]
+        students += [val]
+        # else:
+            # print(f"[Critical Warning Student] Contradictory data: {val['Email']} at row {idx + 1}")
+            # confused_students += [val]
     elif 'Senior Architect' in val[' The Meet-A-Senior-Architect (MASA) initiative offers mentorship opportunities to students by matching them with researchers in Academia/Industry for 30-minute one-on-one conversations. Are you interested in participating?']:
         if debug:
             print("Found interested mentor:", val['Email'])
@@ -248,7 +248,6 @@ with open('not_matched.csv', 'w', newline='') as csvfile:
         if start == 0 :
             countsad += 1
             writer.writerow([students[i]['First Name'], students[i]['Last Name'], students[i]['Email']])
-            studentname = students[i]['First Name']
 
 
 print(f"Number of relationship formed: {final} score for relationship: {m_choice_industry_academia.value()} with max: { 10 * len(students)}")
