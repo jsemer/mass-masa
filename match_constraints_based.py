@@ -4,7 +4,7 @@ from random import shuffle
 from z3 import *
 from difflib import SequenceMatcher 
 from googlesearch import search
-
+import random
 #TODO IMPORTANT Dealiased last two columns in the csv source file
 
 debug = False  
@@ -126,6 +126,9 @@ for idx, val in enumerate(raw_data):
  
 print (f"{len(students)} students and {len(mentors)} mentors to pair")
 
+# Randomization of the data
+random.shuffle(students)
+random.shuffle(mentors)
 
 # Now generate constraints ( first hard constraints of 1 mentor per student )
 
@@ -224,6 +227,31 @@ for i in range(len(students)):
         if model[relation_student_mentor[i][j]] == 1:
             result += [ (students[i] , mentors[j]) ]
 
+with open('mentee_match.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile, delimiter=',')
+    writer.writerow(["StudentFirstName", "StudentLastName","StudentEmail","MentorFirstName","MentorLastName", "MentorEmail"])
+    for i in range(len(students)):
+        for j in range(len(mentors)):
+            if model[relation_student_mentor[i][j]] == 1:
+                writer.writerow([students[i]['First Name'], students[i]['Last Name'], students[i]['Email'],mentors[j]['First Name'], mentors[j]['Last Name'], mentors[j]['Email']])
+
+# Sad people:
+
+with open('not_matched.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile, delimiter=',')
+    writer.writerow(["StudentFirstName", "StudentLastName","StudentEmail"])
+    countsad = 0
+    for i in range(len(students)):
+        start = 0
+        for j in range(len(mentors)):
+            start += model[relation_student_mentor[i][j]].as_long()
+        if start == 0 :
+            countsad += 1
+            writer.writerow([students[i]['First Name'], students[i]['Last Name'], students[i]['Email']])
+            studentname = students[i]['First Name']
+
+
 print(f"Number of relationship formed: {final} score for relationship: {m_choice_industry_academia.value()} with max: { 10 * len(students)}")
 print(f"Field score: {m_choice_fields.value()}") 
+print(f"We did not manage to match: {countsad}")
 
